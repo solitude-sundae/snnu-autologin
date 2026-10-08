@@ -20,6 +20,7 @@ internal sealed class TrayContext : ApplicationContext, IUserNotify
     private readonly Dictionary<AppState, Icon> _icons;
     private readonly ToolStripMenuItem _autoStartItem;
     private ConfigForm? _configForm;
+    private string? _pendingBalloonAction; // 最近一次气泡携带的点击动作（open-portal / open-config）
 
     public TrayContext(ConfigStore store)
     {
@@ -53,6 +54,20 @@ internal sealed class TrayContext : ApplicationContext, IUserNotify
             Visible = true,
         };
         _tray.DoubleClick += (_, _) => ShowConfigForm("托盘双击");
+        _tray.BalloonTipClicked += (_, _) =>
+        {
+            var action = _pendingBalloonAction;
+            _pendingBalloonAction = null;
+            switch (action)
+            {
+                case "open-portal":
+                    OpenPortal();
+                    break;
+                case "open-config":
+                    ShowConfigForm("气泡点击");
+                    break;
+            }
+        };
 
         _coordinator.Start();
     }
@@ -72,7 +87,7 @@ internal sealed class TrayContext : ApplicationContext, IUserNotify
         }, null);
     }
 
-    void IUserNotify.OnBalloon(string title, string message, BalloonKind kind)
+    void IUserNotify.OnBalloon(string title, string message, BalloonKind kind, string? clickAction)
     {
         _ui.Post(_ =>
         {
@@ -83,7 +98,8 @@ internal sealed class TrayContext : ApplicationContext, IUserNotify
                 BalloonKind.Error => ToolTipIcon.Error,
                 _ => ToolTipIcon.None,
             };
-            _tray.ShowBalloonTip(5000, title, message, tipIcon);
+            _pendingBalloonAction = clickAction;
+            _tray.ShowBalloonTip(6000, title, message, tipIcon);
         }, null);
     }
 

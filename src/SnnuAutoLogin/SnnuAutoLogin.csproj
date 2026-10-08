@@ -11,7 +11,7 @@
     <AssemblyTitle>陕师大校园网自动认证</AssemblyTitle>
     <Product>SnnuAutoLogin</Product>
     <Description>陕西师范大学校园网门户自动认证托盘客户端</Description>
-    <Version>1.1.0</Version>
+    <Version>1.2.0</Version>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <!-- 单文件发布参数（SelfContained/PublishSingleFile/-r win-x64）由发布命令行传入，
          见 docs/05 与 README；不写死在工程里，避免拖累测试工程的引用构建 -->

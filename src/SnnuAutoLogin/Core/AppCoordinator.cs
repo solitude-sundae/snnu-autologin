@@ -13,8 +13,8 @@ public interface IUserNotify
     /// <summary>状态迁移通知（可能在后台线程触发，实现方自行封送到 UI 线程）。</summary>
     void OnStateChanged(AppState from, AppState to, string reason);
 
-    /// <summary>气泡通知。</summary>
-    void OnBalloon(string title, string message, BalloonKind kind);
+    /// <summary>气泡通知。clickAction："open-portal"（打开门户）/ "open-config"（打开配置），用户点击气泡时执行；null 无动作。</summary>
+    void OnBalloon(string title, string message, BalloonKind kind, string? clickAction = null);
 
     /// <summary>请求打开配置窗口（未配置/密码错误场景）。</summary>
     void RequestConfigWindow(string reason);
@@ -51,7 +51,10 @@ public sealed class AppCoordinator : IDisposable
     private bool _fakeOnlinePaused;                // 护栏触发后暂停自愈（外网恢复时自动解除）
     private int _externalRecheckGeneration;        // 外网环境定期复查代号
     private int _unknownFailCount;                 // 未知失败指数退避计数
-    private volatile bool _haltedByCredential;     // 密码错误/验证码熔断，改配置后恢复
+    // 熔断分级：PasswordError=严格熔断（仅改配置恢复）；CaptchaNeeded=暂停自动登录+周期观察自动恢复；null 正常
+    private AuthOutcome? _haltReason;
+    private CancellationTokenSource? _captchaWatchCts; // 验证码暂停期间的观察定时
+    private bool _suffixMismatchWarned;            // 服务类型错配提醒只发一次，配置保存后重置
     private bool _disposed;
 
     public AppCoordinator(ConfigStore store, IUserNotify notify)
@@ -106,13 +109,15 @@ public sealed class AppCoordinator : IDisposable
         _triggers.Writer.TryWrite(reason);
     }
 
-    /// <summary>配置保存后调用：解除熔断/假在线暂停并立即重检。</summary>
+    /// <summary>配置保存后调用：解除熔断/验证码观察/假在线暂停并立即重检。</summary>
     public void OnConfigSaved()
     {
         _config = _store.Load();
         _keywords = _config.Keywords ?? KeywordSet.Default;
-        _haltedByCredential = false;
+        _haltReason = null;
+        StopCaptchaObservation();
         _fakeOnlinePaused = false;
+        _suffixMismatchWarned = false;
         _unknownFailCount = 0;
         TriggerCheck("配置已更新");
     }
@@ -152,9 +157,15 @@ public sealed class AppCoordinator : IDisposable
         {
             return;
         }
-        if (_haltedByCredential)
+        if (_haltReason == AuthOutcome.PasswordError)
         {
             _state.TransitionTo(AppState.Offline, "已熔断：请在配置中修改账号密码");
+            return;
+        }
+        if (_haltReason == AuthOutcome.CaptchaNeeded)
+        {
+            // 验证码暂停：等观察定时发现解除或已在线后自动恢复（见 StartCaptchaObservation）
+            _state.TransitionTo(AppState.Offline, "已暂停：门户要求验证码，观察恢复中");
             return;
         }
 
@@ -212,8 +223,7 @@ public sealed class AppCoordinator : IDisposable
             SaveCapture("login_page_form", loginPageHtml);
             if (PortalResponseParser.ClassifyLoginResponse(loginPageHtml, _keywords) == AuthOutcome.CaptchaNeeded)
             {
-                HaltForManualAction("门户要求验证码，已暂停自动登录", "需要验证码",
-                    "门户要求输入验证码，请在打开的登录页中手动登录一次。");
+                HaltForCaptcha();
                 return;
             }
         }
@@ -221,8 +231,8 @@ public sealed class AppCoordinator : IDisposable
         var password = ConfigStore.DecryptPassword(_config);
         if (password == null)
         {
-            HaltForManualAction("密码解密失败，请重新配置", "密码读取失败",
-                "本地保存的密码无法解密（可能复制自其他电脑），请重新输入。");
+            HaltForManualAction(AuthOutcome.PasswordError, "密码解密失败，请重新配置", "密码读取失败",
+                "本地保存的密码无法解密（可能复制自其他电脑），请重新输入。", "open-config");
             return;
         }
 
@@ -262,17 +272,17 @@ public sealed class AppCoordinator : IDisposable
             }
             case AuthOutcome.PasswordError:
             {
-                _haltedByCredential = true;
+                _haltReason = AuthOutcome.PasswordError;
+                StopCaptchaObservation();
                 _unknownFailCount = 0;
                 _state.TransitionTo(AppState.Offline, "账号或密码错误（已停止重试）");
-                _notify.OnBalloon("登录失败", "账号或密码错误，已停止自动重试，请检查配置。", BalloonKind.Error);
+                _notify.OnBalloon("登录失败", "账号或密码错误，已停止自动重试，请检查配置（点击气泡打开）。", BalloonKind.Error, "open-config");
                 _notify.RequestConfigWindow("账号或密码错误");
                 return;
             }
             case AuthOutcome.CaptchaNeeded:
             {
-                HaltForManualAction("门户要求验证码，已暂停自动登录", "需要验证码",
-                    "门户返回验证码要求，请手动登录一次后再恢复自动认证。");
+                HaltForCaptcha();
                 return;
             }
             case AuthOutcome.PortalUnreachable:
@@ -290,13 +300,112 @@ public sealed class AppCoordinator : IDisposable
         }
     }
 
-    /// <summary>密码错误/验证码等需人工介入的场景：熔断 + 提示 + 打开配置。</summary>
-    private void HaltForManualAction(string stateReason, string title, string message)
+    /// <summary>密码错误等严重凭证问题：严格熔断（仅改配置恢复）。</summary>
+    private void HaltForManualAction(AuthOutcome reason, string stateReason, string title, string message, string? clickAction)
     {
-        _haltedByCredential = true;
+        _haltReason = reason;
+        StopCaptchaObservation();
         _state.TransitionTo(AppState.Offline, stateReason);
-        _notify.OnBalloon(title, message, BalloonKind.Warning);
+        _notify.OnBalloon(title, message, BalloonKind.Error, clickAction);
         _notify.RequestConfigWindow(title);
+    }
+
+    /// <summary>
+    /// 验证码暂停：不再自动尝试（防锁定），但不锁死——启动 5 分钟周期观察：
+    /// 发现已在线（用户已在浏览器手动登录）或门户验证码解除，即自动恢复自动认证。
+    /// 气泡指引"点击打开登录页手动登录一次"，无需打开配置窗口。
+    /// </summary>
+    private void HaltForCaptcha()
+    {
+        _haltReason = AuthOutcome.CaptchaNeeded;
+        _state.TransitionTo(AppState.Offline, "门户要求验证码，已暂停自动登录");
+        _notify.OnBalloon("需要验证码",
+            "门户要求输入验证码，已暂停自动登录。点击本气泡打开登录页，手动登录一次后程序会自动恢复。",
+            BalloonKind.Warning, "open-portal");
+        StartCaptchaObservation();
+    }
+
+    private void StartCaptchaObservation()
+    {
+        StopCaptchaObservation();
+        var cts = new CancellationTokenSource();
+        _captchaWatchCts = cts;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                while (!cts.IsCancellationRequested && _haltReason == AuthOutcome.CaptchaNeeded && !_disposed)
+                {
+                    await Task.Delay(TimeSpan.FromMinutes(5), cts.Token);
+                    if (_disposed || _haltReason != AuthOutcome.CaptchaNeeded)
+                    {
+                        return;
+                    }
+                    // 观察一：用户是否已在浏览器手动登录成功
+                    var probe = await _portal.ProbeStatusAsync(cts.Token);
+                    if (probe.Status == PortalStatus.Online)
+                    {
+                        Log.Info("验证码观察：发现已在线（可能已手动登录），自动恢复");
+                        _haltReason = null;
+                        TriggerCheck("验证码观察恢复");
+                        return;
+                    }
+                    // 观察二：门户验证码是否已解除（冷却结束）
+                    var (reachable, loginHtml) = await _portal.GetLoginPageAsync(cts.Token);
+                    if (reachable && !string.IsNullOrEmpty(loginHtml) &&
+                        PortalResponseParser.ClassifyLoginResponse(loginHtml, _keywords) != AuthOutcome.CaptchaNeeded)
+                    {
+                        Log.Info("验证码观察：登录页验证码已解除，自动恢复");
+                        _haltReason = null;
+                        TriggerCheck("验证码观察恢复");
+                        return;
+                    }
+                    Log.Debug("验证码观察：验证码仍在，继续等待");
+                }
+            }
+            catch (OperationCanceledException) { /* 恢复或退出 */ }
+            catch (Exception ex)
+            {
+                Log.Error($"验证码观察异常: {ex.Message}");
+            }
+        });
+    }
+
+    private void StopCaptchaObservation()
+    {
+        _captchaWatchCts?.Cancel();
+        _captchaWatchCts?.Dispose();
+        _captchaWatchCts = null;
+    }
+
+    /// <summary>
+    /// 服务类型错配提醒：状态页显示本学号在 X 通道在线，但配置选了 Y——
+    /// 这种错配会在下次掉线重登时反复失败并触发门户验证码（实测案例 2026-09-28）。
+    /// 只在每次进入在线态时提醒一次；别人的会话（如宿舍路由器）不打扰。
+    /// </summary>
+    private void CheckServiceSuffixMismatch(PortalSessionInfo? session)
+    {
+        if (session == null || _suffixMismatchWarned || !_config.IsConfigured)
+        {
+            return;
+        }
+        var verdict = AccountMatcher.Match(session.Account, _config.StudentId, _config.ServiceSuffix);
+        if (verdict == AccountVerdict.Match)
+        {
+            _suffixMismatchWarned = false;
+            return;
+        }
+        if (verdict != AccountVerdict.SuffixMismatch)
+        {
+            return;
+        }
+        _suffixMismatchWarned = true;
+        var actual = AccountMatcher.SuffixOf(session.Account);
+        var actualName = string.IsNullOrEmpty(actual) ? "校园网免费通道" : ServiceTypes.DisplayNameOf(actual);
+        Log.Warn($"服务类型疑似配错：在线通道为 {actualName}，配置为 {ServiceTypes.DisplayNameOf(_config.ServiceSuffix)}");
+        _notify.OnBalloon("服务类型可能配错",
+            $"检测到你的账号实际在「{actualName}」在线，但配置选的是「{ServiceTypes.DisplayNameOf(_config.ServiceSuffix)}」。配置不一致会在下次掉线时登录失败，建议修改（点击气泡打开配置）。",
+            BalloonKind.Warning, "open-config");
     }
 
     /// <summary>进入在线态：启动心跳（仅校园网门户在线才需要）并通知 UI。</summary>
@@ -315,6 +424,7 @@ public sealed class AppCoordinator : IDisposable
         if (alreadyOnline)
         {
             _state.TransitionTo(AppState.Online, session != null ? $"已在线：{Log.Mask(session.Account)}" : "已在线");
+            CheckServiceSuffixMismatch(session);
             return;
         }
 
@@ -580,6 +690,7 @@ public sealed class AppCoordinator : IDisposable
         _lifecycleCts?.Cancel();
         _network?.Dispose();
         StopHeartbeat();
+        StopCaptchaObservation();
         try { _workerTask?.Wait(TimeSpan.FromSeconds(2)); } catch { /* 忽略退出超时 */ }
         _portal?.Dispose();
         _prober?.Dispose();
