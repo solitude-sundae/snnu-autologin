@@ -17,4 +17,9 @@
     <ProjectReference Include="..\..\src\SnnuAutoLogin\SnnuAutoLogin.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- 真实响应夹具（脱敏）：参与回归测试的线上样本 -->
+    <Content Include="fixtures\**\*.html" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

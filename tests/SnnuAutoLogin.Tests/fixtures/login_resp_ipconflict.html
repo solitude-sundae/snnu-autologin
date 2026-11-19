@@ -1,0 +1,397 @@
+
+
+
+<html><head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>闄曡タ甯堣寖澶у缃戠粶Portal</title>
+<style type="text/css">
+<!--
+body {
+	
+	background-image: url(image/bg01-b.gif);
+	
+	background-position:center;
+	background-position:top;
+	background-repeat:no-repeat;
+	margin-left: 0px;
+	margin-top: 0px;
+	margin-right: 0px;
+	margin-bottom: 0px;
+	background-color: #F8F6EB;
+}
+a:link {
+	font-size: 12px;
+	line-height: 20px;
+	font-weight: lighter;
+	color: #666;
+	text-decoration: underline;
+}
+a:visited {
+	font-size: 12px;
+	line-height: 20px;
+	font-weight: lighter;
+	color: #666;
+	text-decoration: underline;
+}
+a:hover {
+	font-size: 12px;
+	line-height: 20px;
+	font-weight: lighter;
+	color: #9933cc;
+	text-decoration: none;
+}
+
+a.linkzi:link {
+	font-size: 12px;
+	line-height: 20px;
+	font-weight: lighter;
+	color: #9933CC;
+	text-decoration: underline;
+}
+a.linkzi:visited {
+	font-size: 12px;
+	line-height: 20px;
+	font-weight: lighter;
+	color: #9933CC;
+	text-decoration: underline;
+}
+a.linkzi:hover {
+	font-size: 12px;
+	line-height: 20px;
+	font-weight: lighter;
+	color: #000000;
+	text-decoration: none;
+}
+.beijing {
+	background-color: #e8e8e8;
+	border: 1px solid #999999;
+	font-size: 14px;
+}
+.zhengwen {
+	font-size: 12px;
+	line-height: 16px;
+	font-weight: lighter;
+	color: #000000;
+	text-decoration: none;
+	font-family: Arial, Helvetica, sans-serif;
+}
+
+
+.zhengwen1 {font-size: 14px;
+	line-height: 20px;
+	font-weight: lighter;
+	color: #333333;
+	text-decoration: none;
+}
+.zhengwen2 {	font-size: 12px;
+	line-height: 16px;
+	font-weight: lighter;
+	color: #666666;
+	text-decoration: none;
+	font-family: Arial, Helvetica, sans-serif;
+}
+.errormsg {font-size: 14px;
+	line-height: 20px;
+	font-weight: lighter;
+	color: red;
+	text-decoration: none;
+}
+.dianhua {	font-family: Arial, Helvetica, sans-serif;
+	font-size: 18px;
+	font-weight: bold;
+	color: #FF6600;
+	text-decoration: none;
+}
+.input div.radio label{
+position: relative;
+display: inline-block;
+padding-left:20px;font-size: 14px;
+}
+.input div.radio input{
+            /*display: none;*/
+            position: absolute;
+            opacity: 0;
+            width: 0;
+            height: 0;
+            margin: 0;
+            padding: 0;
+            border: none;
+}
+.input div.radio label::before {
+content: '';
+position: absolute;
+top: 50%;
+left: 0;
+transform: translate(0, -50%);
+width:15px;
+height:15px;
+border:1px solid #555;
+border-radius: 100%;
+}
+
+.input div.radio input + label::before {
+border:1px solid #aaa;
+}
+
+.input div.radio input:checked + label::after {
+content: '';
+position: absolute;
+top: 50%;
+left:2px;
+transform: translate(0, -50%);
+width:13px;
+height:13px;
+border-radius: 100%;
+background: #aaa;
+}
+-->
+
+#mb{
+    display: none;
+    height: 100%;
+    width: 100%;
+    position: fixed;
+    *position: absolute;
+    *height: 1380px;
+    background: black;
+    top:0;
+    left: 0;
+    opacity:0.6;
+}
+</style>
+<script type="text/JavaScript">
+<!--
+function MM_preloadImages() { //v3.0
+  var d=document; if(d.images){ if(!d.MM_p) d.MM_p=new Array();
+    var i,j=d.MM_p.length,a=MM_preloadImages.arguments; for(i=0; i<a.length; i++)
+    if (a[i].indexOf("#")!=0){ d.MM_p[j]=new Image; d.MM_p[j++].src=a[i];}}
+    var accountValue = getCookieValue("account");
+    document.forms[0].account.value =  accountValue;
+    var passwordValue = getCookieValue("password");   
+    document.forms[0].password.value =  passwordValue;
+    var issaveValue = getCookieValue("issave");
+    if(issaveValue=='true')
+    {
+    	document.forms[0].issave.checked = true;
+    }
+    else
+    {
+    	document.forms[0].issave.checked = false;
+    }
+    document.forms[0].account.focus();
+}
+
+function MM_swapImgRestore() { //v3.0
+  var i,x,a=document.MM_sr; for(i=0;a&&i<a.length&&(x=a[i])&&x.oSrc;i++) x.src=x.oSrc;
+}
+
+function MM_findObj(n, d) { //v4.01
+  var p,i,x;  if(!d) d=document; if((p=n.indexOf("?"))>0&&parent.frames.length) {
+    d=parent.frames[n.substring(p+1)].document; n=n.substring(0,p);}
+  if(!(x=d[n])&&d.all) x=d.all[n]; for (i=0;!x&&i<d.forms.length;i++) x=d.forms[i][n];
+  for(i=0;!x&&d.layers&&i<d.layers.length;i++) x=MM_findObj(n,d.layers[i].document);
+  if(!x && d.getElementById) x=d.getElementById(n); return x;
+}
+
+function MM_swapImage() { //v3.0
+  var i,j=0,x,a=MM_swapImage.arguments; document.MM_sr=new Array; for(i=0;i<(a.length-2);i+=3)
+   if ((x=MM_findObj(a[i]))!=null){document.MM_sr[j++]=x; if(!x.oSrc) x.oSrc=x.src; x.src=a[i+2];}
+}
+
+//-->
+</script>
+
+<link href="css/toastr.min.css" type="text/css" rel="stylesheet"> 
+<link href="css/sweetalert.css" type="text/css" rel="stylesheet"> 
+<script language="JavaScript" src="js/jquery-1.4.4.js" charset="UTF-8"></script>
+<script src="js/toastr.min.js"></script>
+<script src="js/sweetalert.js"></script>
+<script language="javascript" src="js/bind.js?v=1795101409809" charset="UTF-8"></script>
+<script language="javascript" src="js/jquery.shCircleLoader.js" charset="UTF-8"></script>
+<script language="javascript" src="js/login.js?v=1795101409809" charset="UTF-8"></script>
+</head>
+
+<body onload="MM_preloadImages('image/denglu02.gif')">
+<form action="login" method="post" > 
+<input type="hidden" name="sourceurl" value="null"/>
+<blockquote>
+  <table align="center" border="0" cellpadding="0" cellspacing="0" width="900">
+    <tbody>
+    <tr>
+      <td height="156" valign="top"><div align="center"></div></td>
+    </tr>
+    <tr>
+      <td height="412" valign="top">
+      <table align="right" border="0" cellpadding="0" cellspacing="0" width="501">
+        <tbody>
+        <tr>
+          <td height="60" width="151">&nbsp;</td>
+          <td valign="bottom" width="350"><img src="image/login01.gif" height="60" width="150"></td>
+        </tr>
+        <tr>
+          <td height="35">&nbsp;</td>
+          <td height="250" valign="top"><table border="0" cellpadding="0" cellspacing="1" width="311">
+              <tbody><tr>
+                <td class="zhengwen1" height="25" width="81"><div class="zhengwen1" align="right"></div></td>
+                <td class="errormsg" width="252">
+                涓浗鑱旈€氳璇佸け璐ワ細Rad:IP conflict !</td>
+              </tr>
+              <tr>
+                <td class="zhengwen1" height="35" width="81"><div class="zhengwen1" align="right"><span>璐?nbsp;&nbsp;&nbsp;鍙凤細</span></div></td>
+                <td width="252"><input style="width:230px; height:30px; " name="account" class="beijing" size="25" maxlength="25" type="text"></td>
+              </tr>
+              <tr>
+                <td class="zhengwen1" height="35" width="81"><div class="style12" align="right">瀵?nbsp;&nbsp;&nbsp;鐮侊細</div></td>
+                <td width="252"><input style="width:230px; height:30px; " name="password" class="beijing" size="25" maxlength="25" type="password"></td>
+              </tr>
+              <!-- <tr>
+                <td class="zhengwen1" height="35" width="81"><div class="zhengwen1" align="right"><span>杩愯惀鍟嗭細</span></div></td>
+                <td width="252">
+                	<select id="login_yys" name="yys" class="beijing" style="width:230px; height:30px; "  >
+                		<option selected="selected" value="">鏍″洯缃?/option>
+                		<option value="unicom">涓浗鑱旈€?/option>
+                		<option value="mobile">涓浗绉诲姩</option>
+                	</select>
+                </td>
+              </tr> -->
+              
+              <tr>
+                <td class="zhengwen1" height="35" width="81"><div class="zhengwen1" align="right"><span>鏍″洯缃戯細</span></div></td>
+                <td width="252" class="flex-h input">
+                   <div class="flex-1 tx-r radio" style="margin-top: 5px;">
+                   	<div style="width:120px; height:28px; float: left;">
+                   		<input type="radio" name="yys" id="n0" class="" value="" checked="checked" />
+						<label for="n0" class="">
+						鏍″洯缃?
+						</label>
+                   </div>
+				   </div>
+                </td>
+              </tr> 
+              
+              <tr>
+                <td class="zhengwen1" height="35" width="81"><div class="zhengwen1" align="right"><span>浠?nbsp;&nbsp;&nbsp;鎷細</span></div></td>
+                <td width="252" class="flex-h input">
+                   <div class="flex-1 tx-r radio" style="margin-top: 5px;">
+                   <div style="width:60px; height:28px;float: left;">
+						<input type="radio" name="yys" id="n1" class="" value="unicom" />
+						<label for="n1" class="">
+						鑱?nbsp;&nbsp;&nbsp;閫?
+						</label>
+					</div>
+                   <div style="width:60px; height:28px;float: left;padding-left: 14px;">
+						<input type="radio" name="yys" id="n2" class="" value="mobile" />
+						<label for="n2" class="">
+						绉?nbsp;&nbsp;&nbsp;鍔?
+						</label>
+					</div>
+                   <div style="width:60px; height:28px;float: left;padding-left: 14px; display: none;">
+						<input type="radio" name="yys" id="n3" class="" value="telecom" />
+						<label for="n3" class="">
+						鐢?nbsp;&nbsp;&nbsp;淇?
+						</label>
+					</div>
+					</div>
+                </td>
+              </tr> 
+             
+               
+              <tr>
+                <td class="zhengwen1" height="35"><div align="right"><span class="style12">楠岃瘉鐮?span class="STYLE1 style12"><span style="font-weight: lighter; text-decoration: none; font-size: 12px;" #invalid_attr_id="20px">锛?/span></span></span></div></td>
+                <!-- <td><input name="checkcode" class="beijing" style="width:80px; height:30px; " size="4" maxlength="4" type="text">
+                    <img title="鐐瑰嚮鏇存崲" onclick="javascript:refresh(this);" src="imageServlet" height="25" width="100">
+                    </td> -->
+                 <td width="252" style="vertical-align: middle;">
+	                  <div style="width: 128px;float: left;">
+					  	<input name="checkcode" type="text" class="beijing" style="width:120px; height:30px; " value="" size="4" maxlength="4">
+					  </div>
+			          <div style="width: 100px;float: left;">
+			          	<img title="鐐瑰嚮鏇存崲" onclick="javascript:refresh(this);" src="imageServlet" width="100" height="30" >
+			    	</div> 
+			      </td>
+              </tr>
+              
+              <tr>
+              <td height="35"></td>
+                <td><table border="0" cellpadding="0" cellspacing="0" width="230px">
+                    <tbody><tr>
+                      <td width="50%" align="left"> <input type="checkbox" name="issave" value="" onclick="checksave()">璁颁綇瀵嗙爜                 
+                        </td>
+                        <!-- <td width="50%" align="right">  <a href="bind.jsp" target="_blank" style="font-size: 16px;color:#f00;">缁戝畾杩愯惀鍟?/a>                    
+                        </td> -->
+                        </tr>
+                </tbody></table>
+                       </td>
+              </tr>
+              <!-- <tr>	
+                  <td height="20" colspan="2" ><div align="left" style="padding-left:37px;text-align:left; font-size:16px; color:#F00; font-weight:300;line-height:22px">
+				  鎸夌収瀛︽牎鐤儏闃叉帶宸ヤ綔鎸囨尌閮ㄨ姹傦紝<br>
+				  鐤儏鏈熼棿鏍″洯缃戝瀛︾敓鏆傛椂鍏嶈垂寮€鏀俱€?
+				  </div></td>
+                </tr> -->
+              <tr>
+                <td height="40">&nbsp;</td>
+                <td valign="bottom"><table border="0" cellpadding="0" cellspacing="0" width="230">
+                    <tbody><tr>
+                      <td>   
+                          <!-- <input onclick="loginSubmit();" type="image" src="image/denglu01.gif" align="middle" width="131" height="37" border="0"> -->
+                          <a href="#" onclick="loginSubmit(false);">
+                          	<img src="image/denglu01.gif" align="middle" width="131" height="37" border="0">
+                          </a>
+                          <!--   
+                          <a id="qr_login" href="http://202.117.144.205:8604/snnuportal/qr_login.jsp" 
+                          style="margin-left:10px; color: #369;  cursor: pointer;  font-size:16px;  line-height: 40px;position: fixed;">浜岀淮鐮佺櫥褰?/a>
+                          -->
+                        </td></tr>
+                </tbody></table></td>
+              </tr>
+              
+          </tbody></table></td>
+        </tr>
+        <tr>
+          <td>&nbsp;</td>
+          <td height="20"><div align="center"><span class="zhengwen2"><a href="http://202.117.144.205/zili">鑷姪鏈嶅姟涓婚〉</a>
+          <!-- 
+          &nbsp;&nbsp;&nbsp; | &nbsp;&nbsp;<a href="http://www.snnu.edu.cn/">瀛︽牎涓婚〉</a>
+          &nbsp;&nbsp;&nbsp;| &nbsp;&nbsp;<a href="http://202.117.144.205/zili_pre/">涓存椂璐﹀彿娉ㄥ唽</a> 
+          -->
+          &nbsp;&nbsp;&nbsp; | &nbsp;&nbsp;<span class="zhengwen2" style="color: #000">褰撳墠IP:10.100.2.10 </span>
+          </span></div></td>
+          
+        </tr>
+        <!-- <tr>
+        <td>&nbsp;</td>
+            <td height="40"><div align="left" style="">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="zhengwen2" style="color: #000">褰撳墠IP:10.100.2.10 </span></div></td>
+          </tr> -->
+      </tbody></table></td>
+    </tr>
+  </tbody></table>
+  <table align="center" border="0" cellpadding="0" cellspacing="0" height="50" width="767">
+    <tbody><tr>
+      <td><div class="zhengwen" align="center"><span class="zhengwen2">Copyright 锛圕锛?012 闄曡タ甯堣寖澶у</span> &nbsp;<span class="zhengwen2">鏈嶅姟鐢佃瘽锛?span class="dianhua">029-85310558</span></span><br>
+      </div></td>
+    </tr>
+  </tbody></table>
+</blockquote>
+</form>
+
+
+<div id="mb">
+<!-- <div style="width: 700px; margin: 0 auto;">
+
+</div> -->
+<div id="loading" style="width: 55px; height: 55px; margin:auto; margin-top: calc(47vh);" >
+</div>
+</div>
+
+
+     
+</body>
+<script type="text/javascript">
+	var check_radio = $('input[name="yys"]:checked');
+	if(!check_radio || check_radio.length<=0){
+		$('#n0').attr('checked','checked');
+	}
+</script>
+</html>
+

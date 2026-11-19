@@ -108,4 +108,12 @@ public class RetryPolicyTests
         Assert.Equal(TimeSpan.FromSeconds(60), RetryPolicy.NextDelay(AuthOutcome.UnknownFailure, 3));
         Assert.Equal(TimeSpan.FromSeconds(60), RetryPolicy.NextDelay(AuthOutcome.UnknownFailure, 99));
     }
+
+    [Fact]
+    public void IP冲突_固定5分钟()
+    {
+        // RADIUS IP 冲突只能等旧会话释放，短间隔重试会反复失败并续命验证码惩罚
+        Assert.Equal(TimeSpan.FromMinutes(5), RetryPolicy.NextDelay(AuthOutcome.IpConflict, 0));
+        Assert.Equal(TimeSpan.FromMinutes(5), RetryPolicy.NextDelay(AuthOutcome.IpConflict, 9));
+    }
 }

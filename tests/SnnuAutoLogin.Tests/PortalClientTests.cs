@@ -204,6 +204,36 @@ public class PortalClientTests : IDisposable
     }
 
     [Fact]
+    public async Task 响应声明GB2312但实为UTF8字节_仍正确解码()
+    {
+        // 实测缺陷（2026-11-19）：失败页声明 GB2312，字节却是 UTF-8，
+        // 按 GB2312 解会把"中国联通认证失败"解成乱码，弹给用户的报错也变乱码。
+        const string html = "<html><body><td class=\"errormsg\">中国联通认证失败：Rad:IP conflict !</td></body></html>";
+        _handler.Respond = (_, _) => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new ByteArrayContent(Encoding.UTF8.GetBytes(html)),
+        };
+
+        using var client = CreateClient();
+        var (outcome, body) = await client.LoginAsync(new LoginRequest("20231001", "pw", "unicom"));
+        Assert.Equal(AuthOutcome.IpConflict, outcome);
+        Assert.Contains("中国联通认证失败", body);
+    }
+
+    [Fact]
+    public async Task 真实捕获的失败页_判为IP冲突而非验证码()
+    {
+        // 夹具为 2026-11-19 线上真实响应（已脱敏 IP）：errormsg 报 Rad:IP conflict，
+        // 页面同时带被注释掉的 checkcode 字段——旧实现据此误判成 CaptchaNeeded。
+        var path = Path.Combine(AppContext.BaseDirectory, "fixtures", "login_resp_ipconflict.html");
+        Assert.True(File.Exists(path), $"缺少测试夹具: {path}");
+        var html = await File.ReadAllTextAsync(path);
+
+        Assert.Equal(AuthOutcome.IpConflict, PortalResponseParser.ClassifyLoginResponse(html, KeywordSet.Default));
+        Assert.Contains("Rad:IP conflict", PortalResponseParser.ExtractErrorText(html));
+    }
+
+    [Fact]
     public async Task 流量查询_解析已用剩余()
     {
         _handler.Respond = (_, _) => new HttpResponseMessage(HttpStatusCode.OK)

@@ -18,6 +18,15 @@ public static partial class PortalResponseParser
     [GeneratedRegex("""登录时间：\s*([0-9\-: ]+)""", RegexOptions.Compiled)]
     private static partial Regex LoginTimeRegex();
 
+    /// <summary>门户错误提示单元格：&lt;td class="errormsg"&gt;中国联通认证失败：Rad:IP conflict !&lt;/td&gt;</summary>
+    [GeneratedRegex(@"<(td|div|span)[^>]*class=""errormsg""[^>]*>(.*?)</\1>",
+        RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled)]
+    private static partial Regex ErrorBoxRegex();
+
+    /// <summary>登录页提交前的验证码输入框（存在即表示本次登录必须先填验证码）。</summary>
+    [GeneratedRegex(@"name\s*=\s*[""']checkcode[""']", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
+    private static partial Regex CaptchaFieldRegex();
+
     private static readonly Regex Whitespace = new(@"\s+", RegexOptions.Compiled);
 
     /// <summary>判断页面是否为"已认证在线"状态页。</summary>
@@ -33,10 +42,11 @@ public static partial class PortalResponseParser
 
     /// <summary>
     /// 判定登录 POST 响应属于哪一类结果。
-    /// 检查顺序即优先级：验证码 → 密码错误 → 已在线 → 成功关键字 → 在线状态页 → 未知。
-    /// 密码错误放在成功之前，防止"登录失败：密码错误"这类页面被"登录"字样误判。
-    /// 实测（2026-09-23 采样）：门户登录成功时直接返回在线状态页（含"当前登录账号"），
-    /// 故命中在线标记同样判为成功。
+    /// 优先级：门户错误框原文 → 各错误关键字 → 成功 → 未知。
+    /// 说明（实测 2026-11-19）：登录失败时门户会把整张登录表单连同一段
+    /// "中国联通认证失败：Rad:IP conflict !" 一起重画回来，验证码输入框也会随之出现；
+    /// 若先按 checkcode 字段判定，真实错误（IP 冲突/密码错误）就被掩盖了。
+    /// 因此这里以 errormsg 里的原文为准，checkcode 字段不参与本次判定。
     /// </summary>
     public static AuthOutcome ClassifyLoginResponse(string html, KeywordSet keywords)
     {
@@ -44,27 +54,50 @@ public static partial class PortalResponseParser
         {
             return AuthOutcome.UnknownFailure;
         }
-        if (ContainsAny(html, keywords.CaptchaNeeded))
+
+        // 一、门户明确给出的错误原文优先级最高
+        var errorText = ExtractErrorText(html);
+        if (!string.IsNullOrEmpty(errorText))
         {
-            return AuthOutcome.CaptchaNeeded;
+            if (ContainsAny(errorText, keywords.IpConflict)) return AuthOutcome.IpConflict;
+            if (ContainsAny(errorText, keywords.PasswordError)) return AuthOutcome.PasswordError;
+            if (ContainsAny(errorText, keywords.AlreadyOnline)) return AuthOutcome.AlreadyOnline;
+            if (ContainsAny(errorText, keywords.CaptchaNeeded)) return AuthOutcome.CaptchaNeeded;
+            if (ContainsAny(errorText, keywords.LoginSuccess)) return AuthOutcome.Success;
+            // 有错误原文但无法归类：继续走下面的通用判定（可能成功页也带 errormsg）
         }
-        if (ContainsAny(html, keywords.PasswordError))
-        {
-            return AuthOutcome.PasswordError;
-        }
-        if (ContainsAny(html, keywords.AlreadyOnline))
-        {
-            return AuthOutcome.AlreadyOnline;
-        }
-        if (ContainsAny(html, keywords.LoginSuccess))
-        {
-            return AuthOutcome.Success;
-        }
-        if (LooksOnline(html, keywords))
-        {
-            return AuthOutcome.Success;
-        }
+
+        // 二、通用关键字（全文），IP 冲突仍排在最前
+        if (ContainsAny(html, keywords.IpConflict)) return AuthOutcome.IpConflict;
+        if (ContainsAny(html, keywords.PasswordError)) return AuthOutcome.PasswordError;
+        if (ContainsAny(html, keywords.AlreadyOnline)) return AuthOutcome.AlreadyOnline;
+        if (ContainsAny(html, keywords.CaptchaNeeded)) return AuthOutcome.CaptchaNeeded;
+        if (ContainsAny(html, keywords.LoginSuccess)) return AuthOutcome.Success;
+        if (LooksOnline(html, keywords)) return AuthOutcome.Success;
         return AuthOutcome.UnknownFailure;
+    }
+
+    /// <summary>
+    /// 登录页（POST 之前 GET 到的表单页）是否已要求验证码。
+    /// 与 <see cref="ClassifyLoginResponse"/> 区分：前者看"提交前表单有没有验证码框"，
+    /// 后者看"提交后门户报了什么错"。
+    /// </summary>
+    public static bool RequiresCaptchaOnLoginPage(string? html)
+        => !string.IsNullOrEmpty(html) && CaptchaFieldRegex().IsMatch(html);
+
+    /// <summary>提取门户 errormsg 错误框的纯文本；没有错误框时返回空串。</summary>
+    public static string ExtractErrorText(string? html)
+    {
+        if (string.IsNullOrEmpty(html))
+        {
+            return string.Empty;
+        }
+        var m = ErrorBoxRegex().Match(html);
+        if (!m.Success)
+        {
+            return string.Empty;
+        }
+        return ToPlainText(m.Groups[2].Value, 200);
     }
 
     /// <summary>从状态页提取会话信息（账号、IP、登录时间）。解析失败的字段为 null。</summary>

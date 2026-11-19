@@ -31,7 +31,7 @@ internal sealed class TrayContext : ApplicationContext, IUserNotify
         _coordinator = new AppCoordinator(store, this);
 
         var menu = new ContextMenuStrip();
-        var checkNow = new ToolStripMenuItem("立即检测", null, (_, _) => _coordinator.TriggerCheck("手动触发"));
+        var checkNow = new ToolStripMenuItem("立即检测", null, (_, _) => _coordinator.RequestManualCheck());
         var config = new ToolStripMenuItem("配置…", null, (_, _) => ShowConfigForm("手动打开"));
         _autoStartItem = new ToolStripMenuItem("开机自启动", null, (_, _) => ToggleAutoStart())
         {

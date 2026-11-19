@@ -12,6 +12,12 @@ public enum AuthOutcome
     /// <summary>该账号已在别处在线（同源 IP 重复登录顶替）。</summary>
     AlreadyOnline,
 
+    /// <summary>
+    /// RADIUS 侧 IP 冲突（实测报错 "Rad:IP conflict !"）：该 IP 已被别的会话占用，
+    /// 或本账号在另一个 IP 上仍有未释放的会话。快速重试无用，只能等待会话老化或强制下线。
+    /// </summary>
+    IpConflict,
+
     /// <summary>门户要求验证码（checkcode 字段出现），自动登录被阻断，转人工。</summary>
     CaptchaNeeded,
 

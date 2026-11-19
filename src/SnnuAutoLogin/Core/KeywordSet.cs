@@ -21,8 +21,14 @@ public sealed class KeywordSet
     /// <summary>已在线/别处登录。</summary>
     public List<string> AlreadyOnline { get; set; } = new() { "已经在线", "已在线", "别处登录", "不要重复登录", "重复登录" };
 
-    /// <summary>需要验证码。</summary>
-    public List<string> CaptchaNeeded { get; set; } = new() { "name=\"checkcode\"", "name='checkcode'", "验证码错误", "输入验证码" };
+    /// <summary>
+    /// RADIUS 侧 IP 冲突（实测 2026-11-19 门户报错 "中国联通认证失败：Rad:IP conflict !"）。
+    /// 快速重试会持续失败并触发门户验证码惩罚，必须长间隔等待。
+    /// </summary>
+    public List<string> IpConflict { get; set; } = new() { "Rad:IP conflict", "Rad: IP conflict", "IP conflict", "IP冲突", "IP 冲突" };
+
+    /// <summary>需要验证码：仅在"验证码"确实是本次失败原因时命中（不包含 checkcode 字段本身）。</summary>
+    public List<string> CaptchaNeeded { get; set; } = new() { "验证码错误", "验证码不正确", "输入验证码", "请输入验证码" };
 
     [JsonIgnore]
     public static KeywordSet Default => new();

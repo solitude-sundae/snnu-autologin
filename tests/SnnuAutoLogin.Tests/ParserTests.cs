@@ -69,10 +69,72 @@ public class ParserTests
     }
 
     [Fact]
-    public void ClassifyLoginResponse_验证码()
+    public void ClassifyLoginResponse_验证码_只认明确文案而非字段存在()
     {
-        Assert.Equal(AuthOutcome.CaptchaNeeded,
+        // 回归（2026-11-19 线上故障）：登录失败时门户会把整张表单连验证码框一起重画，
+        // 旧实现据此判成 CaptchaNeeded，掩盖了真正的 Rad:IP conflict 报错。
+        Assert.Equal(AuthOutcome.UnknownFailure,
             PortalResponseParser.ClassifyLoginResponse("""<input name="checkcode" type="text"/>""", _kw));
+        // 真正的验证码错误才有此文案
+        Assert.Equal(AuthOutcome.CaptchaNeeded,
+            PortalResponseParser.ClassifyLoginResponse("<div class=\"errormsg\">验证码错误，请重新输入</div>", _kw));
+    }
+
+    [Fact]
+    public void ClassifyLoginResponse_Rad的IP冲突_优先于验证码字段()
+    {
+        // 真实捕获样本节选（2026-11-19，账号已脱敏）：错误框 + 重画的验证码表单
+        const string realResponse = """
+            <table><tr>
+              <td class="errormsg" width="252">
+                    中国联通认证失败：Rad:IP conflict !</td>
+            </tr><tr>
+              <td><input style="width:230px;" name="account" type="text"/></td>
+              <td><input name="password" type="password"/></td>
+              <td><input name="checkcode" type="text"/></td>
+            </tr></table>
+            """;
+        Assert.Equal(AuthOutcome.IpConflict,
+            PortalResponseParser.ClassifyLoginResponse(realResponse, _kw));
+        Assert.Contains("Rad:IP conflict", PortalResponseParser.ExtractErrorText(realResponse));
+    }
+
+    [Fact]
+    public void ClassifyLoginResponse_错误框里的密码错误_不受验证码字段干扰()
+    {
+        const string response = """
+            <td class="errormsg">密码错误，请重新输入</td>
+            <input name="checkcode" type="text"/>
+            """;
+        Assert.Equal(AuthOutcome.PasswordError,
+            PortalResponseParser.ClassifyLoginResponse(response, _kw));
+    }
+
+    [Fact]
+    public void RequiresCaptchaOnLoginPage_按表单字段判断()
+    {
+        // 提交前的干净登录页（2026-11-19 捕获，13377B，无验证码）
+        Assert.False(PortalResponseParser.RequiresCaptchaOnLoginPage("""
+            <form action="login" method="post">
+              <input name="account" type="text"/>
+              <input name="password" type="password"/>
+            </form>
+            """));
+        // 门户开始要求验证码
+        Assert.True(PortalResponseParser.RequiresCaptchaOnLoginPage("""
+            <form action="login" method="post">
+              <input name="account" type="text"/>
+              <input name='checkcode' type="text"/>
+            </form>
+            """));
+        Assert.False(PortalResponseParser.RequiresCaptchaOnLoginPage(null));
+    }
+
+    [Fact]
+    public void ExtractErrorText_无错误框返回空()
+    {
+        Assert.Equal(string.Empty, PortalResponseParser.ExtractErrorText(OnlineStatusHtml));
+        Assert.Equal(string.Empty, PortalResponseParser.ExtractErrorText(""));
     }
 
     [Fact]

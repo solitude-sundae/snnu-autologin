@@ -207,17 +207,37 @@ public sealed class PortalClient : IDisposable
         }
     }
 
+    /// <summary>严格 UTF-8 解码器：遇到非法字节序列抛异常，用于判断响应到底是不是 UTF-8。</summary>
+    private static readonly UTF8Encoding StrictUtf8 = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
+
+    private static readonly Encoding Gb2312 = Encoding.GetEncoding("GB2312");
+
+    /// <summary>
+    /// 门户绝大多数页面是 GB2312，但实测（2026-11-19）登录失败页虽声明 charset=GB2312，
+    /// 字节实际是 UTF-8：按 GB2312 解会把"中国联通认证失败"解成乱码。
+    /// 故先用严格 UTF-8 试解（GB2312 的中文几乎不可能构成合法 UTF-8 序列），失败才回落 GB2312。
+    /// </summary>
     private static async Task<string?> ReadBodyAsync(HttpResponseMessage resp, CancellationToken ct)
     {
         var bytes = await resp.Content.ReadAsByteArrayAsync(ct);
-        if (bytes.Length == 0)
+        return bytes.Length == 0 ? null : DecodeBody(bytes);
+    }
+
+    /// <summary>编码判定（同步，避免在异步方法中使用 Span）。</summary>
+    private static string DecodeBody(byte[] bytes)
+    {
+        if (bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF)
         {
-            return null;
+            return Encoding.UTF8.GetString(bytes, 3, bytes.Length - 3);
         }
-        // 门户全站 GB2312；UTF-8 BOM 的兜底以防个别页面编码不一致
-        return bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF
-            ? Encoding.UTF8.GetString(bytes)
-            : Encoding.GetEncoding("GB2312").GetString(bytes);
+        try
+        {
+            return StrictUtf8.GetString(bytes);
+        }
+        catch (DecoderFallbackException)
+        {
+            return Gb2312.GetString(bytes);
+        }
     }
 
     public void Dispose() => _http.Dispose();

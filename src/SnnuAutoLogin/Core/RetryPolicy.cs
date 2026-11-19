@@ -17,6 +17,9 @@ public static class RetryPolicy
         {
             AuthOutcome.PasswordError => null,
             AuthOutcome.CaptchaNeeded => null,
+            // RADIUS IP 冲突只能等旧会话老化或被强制下线：短间隔重试只会连续失败、
+            // 并把门户的验证码惩罚一直"养"着，故固定 5 分钟一次。
+            AuthOutcome.IpConflict => TimeSpan.FromMinutes(5),
             AuthOutcome.PortalUnreachable or AuthOutcome.NetworkOffline => TimeSpan.FromSeconds(30),
             _ => TimeSpan.FromSeconds(UnknownBackoffSeconds[Math.Clamp(attempt, 0, UnknownBackoffSeconds.Length - 1)]),
         };

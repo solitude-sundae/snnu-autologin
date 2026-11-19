@@ -46,7 +46,8 @@ public sealed class AppCoordinator : IDisposable
     private PeriodicTimer? _heartbeatTimer;
     private Task? _heartbeatTask;
     private int _heartbeatTick;                    // 心跳计数（驱动外网探测节奏）
-    private readonly FakeOnlineDetector _fakeOnline = new();
+    // 连续 3 次（约 6 分钟）才判定假在线：2 次在 DNS 抖动时太容易误判
+    private readonly FakeOnlineDetector _fakeOnline = new(probeEveryNTicks: 2, strikeThreshold: 3);
     private readonly Queue<DateTime> _fakeOnlineRecoveries = new(); // 自愈频率护栏
     private bool _fakeOnlinePaused;                // 护栏触发后暂停自愈（外网恢复时自动解除）
     private int _externalRecheckGeneration;        // 外网环境定期复查代号
@@ -55,6 +56,7 @@ public sealed class AppCoordinator : IDisposable
     private AuthOutcome? _haltReason;
     private CancellationTokenSource? _captchaWatchCts; // 验证码暂停期间的观察定时
     private bool _suffixMismatchWarned;            // 服务类型错配提醒只发一次，配置保存后重置
+    private bool _ipConflictNotified;              // IP 冲突指引只提示一次，网络变化/配置保存后重置
     private bool _disposed;
 
     public AppCoordinator(ConfigStore store, IUserNotify notify)
@@ -90,6 +92,7 @@ public sealed class AppCoordinator : IDisposable
         _network = new NetworkMonitor(reason =>
         {
             Log.Info($"网络事件: {reason}");
+            _ipConflictNotified = false; // 换了网络/重插网线，给一次新的提示机会
             TriggerCheck(reason);
         });
 
@@ -109,6 +112,22 @@ public sealed class AppCoordinator : IDisposable
         _triggers.Writer.TryWrite(reason);
     }
 
+    /// <summary>
+    /// 用户主动点"立即检测"：解除验证码暂停，允许这一次手动尝试。
+    /// 门户的临时验证码到期后，用户点一下就能立刻恢复，不必重启程序。
+    /// </summary>
+    public void RequestManualCheck()
+    {
+        if (_haltReason == AuthOutcome.CaptchaNeeded)
+        {
+            _haltReason = null;
+            StopCaptchaObservation();
+            Log.Info("用户手动触发检测，解除验证码暂停");
+        }
+        _ipConflictNotified = false;
+        TriggerCheck("手动触发");
+    }
+
     /// <summary>配置保存后调用：解除熔断/验证码观察/假在线暂停并立即重检。</summary>
     public void OnConfigSaved()
     {
@@ -118,6 +137,7 @@ public sealed class AppCoordinator : IDisposable
         StopCaptchaObservation();
         _fakeOnlinePaused = false;
         _suffixMismatchWarned = false;
+        _ipConflictNotified = false;
         _unknownFailCount = 0;
         TriggerCheck("配置已更新");
     }
@@ -221,7 +241,8 @@ public sealed class AppCoordinator : IDisposable
         if (reachable && !string.IsNullOrEmpty(loginPageHtml))
         {
             SaveCapture("login_page_form", loginPageHtml);
-            if (PortalResponseParser.ClassifyLoginResponse(loginPageHtml, _keywords) == AuthOutcome.CaptchaNeeded)
+            // 只认"提交前表单里就有验证码框"；提交后的响应判定见 ClassifyLoginResponse 注释
+            if (PortalResponseParser.RequiresCaptchaOnLoginPage(loginPageHtml))
             {
                 HaltForCaptcha();
                 return;
@@ -243,6 +264,12 @@ public sealed class AppCoordinator : IDisposable
             SaveCapture($"login_resp_{outcome}", responseHtml);
         }
         Log.Info($"登录结果: {outcome} (账号 {Log.Mask(_config.FullAccount)})");
+        // 把门户自己给的错误原文记下来（不含密码），否则排查时只能看到分类结果
+        var portalError = PortalResponseParser.ExtractErrorText(responseHtml);
+        if (!string.IsNullOrEmpty(portalError))
+        {
+            Log.Warn($"门户错误原文: {portalError}");
+        }
 
         switch (outcome)
         {
@@ -285,6 +312,23 @@ public sealed class AppCoordinator : IDisposable
                 HaltForCaptcha();
                 return;
             }
+            case AuthOutcome.IpConflict:
+            {
+                // RADIUS 认为该 IP 已被别的会话占用（或本账号在另一个 IP 上还有会话）。
+                // 重试无法解决，只会连续失败并把验证码惩罚养着：长间隔等待 + 一次性指引。
+                _unknownFailCount = 0;
+                _state.TransitionTo(AppState.Offline, "IP 冲突：该 IP 已被其他会话占用，等待释放");
+                Log.Warn("检测到 Rad:IP conflict，转入 5 分钟长间隔等待");
+                if (!_ipConflictNotified)
+                {
+                    _ipConflictNotified = true;
+                    _notify.OnBalloon("登录被拒：IP 冲突",
+                        $"门户返回“{portalError}”。这表示该 IP 上还有别的会话没释放。点击气泡打开门户，点“断开网络”或去自助服务强制下线，然后重插网线；持续 30 分钟以上请联系网络中心 029-85310558。",
+                        BalloonKind.Error, "open-portal");
+                }
+                ScheduleRetry(AuthOutcome.IpConflict);
+                return;
+            }
             case AuthOutcome.PortalUnreachable:
             {
                 _state.TransitionTo(AppState.Offline, "门户请求超时");
@@ -325,6 +369,12 @@ public sealed class AppCoordinator : IDisposable
         StartCaptchaObservation();
     }
 
+    /// <summary>
+    /// 验证码暂停期间的观察：只查状态页（用户是否已在浏览器手动登录成功）。
+    /// 绝不因为"登录页上没有验证码框"就自动再试——实测（2026-11-19）那样会每 5 分钟
+    /// 提交一次、反复失败，反而让门户的验证码惩罚一直续命。
+    /// 临时性验证码到期后，用户点一次"立即检测"即可恢复。
+    /// </summary>
     private void StartCaptchaObservation()
     {
         StopCaptchaObservation();
@@ -341,7 +391,6 @@ public sealed class AppCoordinator : IDisposable
                     {
                         return;
                     }
-                    // 观察一：用户是否已在浏览器手动登录成功
                     var probe = await _portal.ProbeStatusAsync(cts.Token);
                     if (probe.Status == PortalStatus.Online)
                     {
@@ -350,17 +399,7 @@ public sealed class AppCoordinator : IDisposable
                         TriggerCheck("验证码观察恢复");
                         return;
                     }
-                    // 观察二：门户验证码是否已解除（冷却结束）
-                    var (reachable, loginHtml) = await _portal.GetLoginPageAsync(cts.Token);
-                    if (reachable && !string.IsNullOrEmpty(loginHtml) &&
-                        PortalResponseParser.ClassifyLoginResponse(loginHtml, _keywords) != AuthOutcome.CaptchaNeeded)
-                    {
-                        Log.Info("验证码观察：登录页验证码已解除，自动恢复");
-                        _haltReason = null;
-                        TriggerCheck("验证码观察恢复");
-                        return;
-                    }
-                    Log.Debug("验证码观察：验证码仍在，继续等待");
+                    Log.Debug("验证码观察：仍未在线，继续等待手动登录");
                 }
             }
             catch (OperationCanceledException) { /* 恢复或退出 */ }
@@ -591,6 +630,13 @@ public sealed class AppCoordinator : IDisposable
                (now - _fakeOnlineRecoveries.Peek()).TotalMinutes > 30)
         {
             _fakeOnlineRecoveries.Dequeue();
+        }
+        // 两次自愈至少间隔 10 分钟：连续下线重登会把运营商 RADIUS 的会话打乱，
+        // 反而制造 "Rad:IP conflict"（实测事故 2026-11-19）
+        if (_fakeOnlineRecoveries.Count > 0 &&
+            (now - _fakeOnlineRecoveries.Max()).TotalMinutes < 10)
+        {
+            return false;
         }
         if (_fakeOnlineRecoveries.Count >= 3)
         {
