@@ -114,6 +114,7 @@ exe 有 69MB，是因为自包含了 .NET 运行时，对方电脑什么都不�
 | [docs/03](docs/03-技术选型说明.md) | 为什么选 .NET 8 而不是 Python/Electron |
 | [docs/04](docs/04-配置UI原型.md) | 界面原型 |
 | [docs/05](docs/05-测试用例执行表.md) | 测试矩阵与实测记录 |
+| [docs/06](docs/06-故障复盘-RadIP冲突.md) | Rad:IP conflict 事故复盘（2026-11-19） |
 
 接口逆向的原始采样文件含真实账号信息，没有放进仓库，docs/01 里有脱敏版本。
 
